@@ -1,0 +1,42 @@
+# LiteLLM Proxy Configuration
+# Docs: https://docs.litellm.ai/docs/proxy/configs
+#
+# API keys are read from environment variables (.env file)
+# Uncomment models as needed
+
+model_list:
+  # Anthropic (primary)
+  - model_name: claude-opus
+    litellm_params:
+      model: anthropic/claude-opus-4-6
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+
+  - model_name: claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-20250514
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+
+  # OpenAI (optional — uncomment when key is set)
+  # - model_name: gpt-4o
+  #   litellm_params:
+  #     model: openai/gpt-4o
+  #     api_key: "os.environ/OPENAI_API_KEY"
+
+  # Google Gemini (optional)
+  # - model_name: gemini-pro
+  #   litellm_params:
+  #     model: gemini/gemini-2.5-pro
+  #     api_key: "os.environ/GOOGLE_API_KEY"
+
+  # Local Ollama (optional — run on host or sidecar container)
+  # - model_name: local-llama
+  #   litellm_params:
+  #     model: ollama/llama3
+  #     api_base: http://host.docker.internal:11434
+
+general_settings:
+  master_key: "os.environ/LITELLM_MASTER_KEY"
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false

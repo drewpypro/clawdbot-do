@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.openclaw.ai/config-schema.json",
+  "_comment": "Bogoyito Security Agent — vuln alerts and monitoring",
+  "model": "claude-sonnet",
+  "baseUrl": "http://litellm:4000",
+  "channels": {
+    "discord": {
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.openclaw.ai/config-schema.json",
+  "_comment": "Bogoyito Chat Agent — Discord social bot",
+  "model": "claude-sonnet",
+  "baseUrl": "http://litellm:4000",
+  "channels": {
+    "discord": {
+      "enabled": true
+    }
+  }
+}

@@ -1,46 +1,90 @@
 # clawdbot-do
 
-DigitalOcean infrastructure for deploying a remote OpenClaw + LiteLLM instance. Full bootstrap — `terraform apply` gives you a hardened droplet ready to run a second Bogoy with multi-model support via LiteLLM proxy.
+DigitalOcean infrastructure for deploying a remote OpenClaw + LiteLLM multi-agent stack. Full bootstrap — `terraform apply` gives you a hardened droplet with Docker Compose running multiple Bogoyito agents through a unified LiteLLM model gateway.
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    subgraph Internet
+        Discord["Discord API"]
+        Anthropic["Anthropic API"]
+        OpenAI["OpenAI API"]
+        Gemini["Google Gemini API"]
+    end
+
+    subgraph DO["DigitalOcean Project"]
+        subgraph FW["Firewall"]
+            direction TB
+            FW_IN["IN: SSH only\n(restricted CIDRs)"]
+            FW_OUT["OUT: HTTPS, HTTP,\nDNS, NTP, ICMP"]
+        end
+
+        subgraph VPC["VPC 10.10.10.0/24"]
+            subgraph Droplet["Droplet (Debian 13)"]
+                subgraph Docker["Docker Compose Stack"]
+                    LiteLLM["LiteLLM Proxy\n:4000\n(model router)"]
+                    
+                    subgraph Agents["Bogoyito Agents"]
+                        Chat["bogoyito-chat\n(Discord social)"]
+                        Security["bogoyito-security\n(vuln alerts)"]
+                        More["bogoyito-...\n(add more)"]
+                    end
+                end
+
+                UFW["UFW + fail2ban\n(defense in depth)"]
+                Updates["unattended-upgrades"]
+            end
+        end
+    end
+
+    User["Admin SSH"] --> FW_IN --> Droplet
+    
+    Chat --> LiteLLM
+    Security --> LiteLLM
+    More --> LiteLLM
+    
+    LiteLLM --> Anthropic
+    LiteLLM --> OpenAI
+    LiteLLM --> Gemini
+    
+    Chat --> Discord
+    Security --> Discord
 ```
-┌─────────────────────────────────────────────┐
-│          DigitalOcean Project               │
-│            (clawdbot-do)                    │
-│                                             │
-│  ┌───────────────────────────────────────┐  │
-│  │              VPC                      │  │
-│  │         10.10.10.0/24                 │  │
-│  │                                       │  │
-│  │  ┌─────────────────────────────────┐  │  │
-│  │  │         Droplet                 │  │  │
-│  │  │                                 │  │  │
-│  │  │  ┌──────────┐  ┌────────────┐  │  │  │
-│  │  │  │ OpenClaw │  │  LiteLLM   │  │  │  │
-│  │  │  │ Gateway  │  │  Proxy     │  │  │  │
-│  │  │  │ :18789   │  │  :4000     │  │  │  │
-│  │  │  └────┬─────┘  └─────┬──────┘  │  │  │
-│  │  │       │              │          │  │  │
-│  │  │       └──── Discord ─┘          │  │  │
-│  │  │            Anthropic            │  │  │
-│  │  │            OpenAI               │  │  │
-│  │  │            Gemini               │  │  │
-│  │  │            Ollama (local)       │  │  │
-│  │  │                                 │  │  │
-│  │  │  Security:                      │  │  │
-│  │  │  - SSH key-only auth            │  │  │
-│  │  │  - fail2ban + UFW               │  │  │
-│  │  │  - unattended-upgrades          │  │  │
-│  │  └─────────────────────────────────┘  │  │
-│  └───────────────────────────────────────┘  │
-│                                             │
-│  ┌───────────────────────────────────────┐  │
-│  │           Firewall                    │  │
-│  │  IN:  SSH only (restricted CIDRs)     │  │
-│  │  OUT: HTTPS, HTTP, DNS, NTP, ICMP     │  │
-│  └───────────────────────────────────────┘  │
-└─────────────────────────────────────────────┘
+
+### Bootstrap Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant TF as Terraform
+    participant DO as DigitalOcean
+    participant D as Droplet
+
+    U->>TF: terraform apply
+    TF->>DO: Create VPC + Firewall
+    TF->>DO: Create Droplet
+    DO->>D: Boot + run userdata.sh
+    
+    Note over D: System Updates
+    D->>D: apt upgrade + security packages
+    D->>D: SSH hardening + UFW + fail2ban
+    
+    Note over D: User Setup
+    D->>D: Create clawdbot user
+    D->>D: Install Docker + Docker Compose
+    
+    Note over D: Stack Deployment
+    D->>D: Clone config templates
+    D->>D: docker compose build
+    D->>D: Write SETUP.md
+    
+    Note over D: Ready!
+    U->>D: SSH in
+    U->>D: Edit .env (API keys)
+    U->>D: docker compose up -d
+    D->>D: LiteLLM healthcheck passes
+    D->>D: Bogoyitos connect to Discord
 ```
 
 ## Quick Start
@@ -58,20 +102,71 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init
 terraform plan
 terraform apply
+
+# SSH in and finish setup
+ssh root@$(terraform output -raw droplet_ip)
+su - clawdbot
+cat ~/SETUP.md
 ```
 
-## Files
+## Project Structure
 
-| File | Purpose |
-|------|---------|
-| `providers.tf` | Terraform + DO provider config |
-| `variables.tf` | All input variables with defaults |
-| `droplet.tf` | Droplet + SSH key resources |
-| `networking.tf` | VPC + firewall rules |
-| `project.tf` | DO project for dashboard organization |
-| `outputs.tf` | Useful outputs (IPs, IDs, SSH command) |
-| `userdata.sh` | Cloud-init bootstrap script |
-| `terraform.tfvars.example` | Example variable values |
+```
+clawdbot-do/
+├── .github/workflows/
+│   ├── terraform-plan.yaml      # PR → format + validate + plan
+│   ├── terraform-build.yaml     # Push to main → apply
+│   └── terraform-destroy.yaml   # Manual → destroy
+├── config/
+│   ├── litellm.yaml             # LiteLLM model routing config
+│   ├── chat.json                # Chat agent OpenClaw config
+│   └── security.json            # Security agent OpenClaw config
+├── openclaw/
+│   └── Dockerfile               # OpenClaw container image
+├── docker-compose.yml           # Full stack definition
+├── .env.example                 # API key template
+├── droplet.tf                   # Droplet + SSH key
+├── networking.tf                # VPC + firewall rules
+├── project.tf                   # DO project
+├── providers.tf                 # Terraform config
+├── variables.tf                 # Input variables
+├── outputs.tf                   # Useful outputs
+├── userdata.sh                  # Cloud-init bootstrap
+└── terraform.tfvars.example     # Example tfvars
+```
+
+## Adding a New Bogoyito Agent
+
+1. Create a config file in `config/`:
+```json
+{
+  "model": "claude-sonnet",
+  "baseUrl": "http://litellm:4000",
+  "channels": { "discord": { "enabled": true } }
+}
+```
+
+2. Add a service to `docker-compose.yml`:
+```yaml
+  bogoyito-newagent:
+    build:
+      context: ./openclaw
+      dockerfile: Dockerfile
+    container_name: bogoyito-newagent
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+    volumes:
+      - ./config/newagent.json:/home/clawdbot/.openclaw/config.json:ro
+      - bogoyito-newagent-data:/home/clawdbot/.openclaw/workspace
+    env_file:
+      - .env
+```
+
+3. `docker compose up -d bogoyito-newagent`
+
+Each bogoyito is isolated — its own workspace, memory, and personality. They all route through LiteLLM for model access.
 
 ## CI/CD Workflows
 
@@ -102,37 +197,36 @@ su - clawdbot
 cat ~/SETUP.md    # Follow the guide
 ```
 
-1. Edit `~/.env_secrets` with API keys
-2. Edit `~/.litellm/config.yaml` to enable models
-3. Start LiteLLM: `sudo systemctl enable --now litellm`
-4. Run `openclaw setup` → point to LiteLLM at `http://127.0.0.1:4000`
-5. Start OpenClaw: `openclaw gateway install && openclaw gateway start`
+1. Copy `.env.example` to `.env` and populate API keys
+2. Review configs in `config/` — enable/disable models in `litellm.yaml`
+3. `docker compose up -d` — starts LiteLLM + all bogoyitos
+4. Verify: `docker compose ps` and `curl http://localhost:4000/health`
 
 ## Security
 
 - **No inbound web ports** — SSH only, restricted to specified CIDRs
-- SSH key-only authentication (password auth disabled via userdata)
+- SSH key-only authentication (password auth disabled)
 - DO firewall + UFW (defense in depth)
 - fail2ban for brute-force protection
 - Automatic security updates via unattended-upgrades
 - Outbound restricted to HTTPS, HTTP, DNS, NTP (no arbitrary ports)
 - LiteLLM binds to localhost only (127.0.0.1:4000)
-- All secrets in `~/.env_secrets` (600 permissions), never in code
-
-## Source
-
-Patterns derived from existing DO implementations:
-- `johnpshids/digital-ocean-drewplet` (Gitea) — VPC, firewall, droplet baseline
-- `drewpypro/clawdbot-aws` (GitHub) — CI/CD workflows, branch protection patterns
+- All secrets in `.env` (never committed — in `.gitignore`)
+- Each bogoyito runs in its own container with isolated workspace
 
 ## Cost Estimate
 
 | Resource | Monthly Cost |
 |----------|-------------|
 | 1x s-1vcpu-1gb Droplet | ~$6 |
-| VPC | Free |
-| Firewall | Free |
-| Monitoring | Free |
+| VPC / Firewall / Monitoring | Free |
 | **Total** | **~$6/mo** |
 
-Costs scale with droplet size and count. See [DO pricing](https://www.digitalocean.com/pricing/droplets).
+> **Note:** For multiple agents, consider bumping to `s-2vcpu-2gb` (~$12/mo). Each OpenClaw instance + LiteLLM proxy adds ~200-400MB RAM overhead.
+
+## Inspiration
+
+Bootstrap-and-test pattern derived from:
+- [`drewpypro/aws-privatelink-protocol-tester`](https://github.com/drewpypro/aws-privatelink-protocol-tester) — full test environment via userdata
+- [`drewpypro/aws-vpce-policy-tester`](https://github.com/drewpypro/aws-vpce-policy-tester) — automated test harness on apply
+- [`drewpypro/aws-backbone-routing-tester`](https://github.com/drewpypro/aws-backbone-routing-tester) — multi-instance bootstrap with scripts

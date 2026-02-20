@@ -1,22 +1,9 @@
-# Terraform
+.terraform/
 *.tfstate
 *.tfstate.*
-*.tfstate.backup
-.terraform/
 .terraform.lock.hcl
-crash.log
-crash.*.log
-
-# Variables (may contain secrets)
 terraform.tfvars
-*.auto.tfvars
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+*.tfvars
+!terraform.tfvars.example
+.env
+*.pem
