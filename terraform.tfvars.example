@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and fill in values
+# DO NOT commit terraform.tfvars — it's in .gitignore
+
+digitalocean_token   = "dop_v1_xxxxxxxxxxxx"
+ssh_public_key       = "ssh-ed25519 AAAA..."
+ssh_private_key_path = "~/.ssh/id_ed25519"
+
+region       = "nyc3"
+droplet_size = "s-1vcpu-1gb"
+droplet_image = "debian-13-x64"
+droplet_name = "clawdbot"
+droplet_count = 1
+
+vpc_cidr         = "10.10.10.0/24"
+allowed_ssh_cidrs = ["YOUR_IP/32"]
+
+project_name = "clawdbot-do"
+environment  = "dev"
+
+enable_backups    = false
+enable_ipv6       = false
+enable_monitoring = true

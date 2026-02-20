@@ -1,0 +1,79 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '*.tf'
+      - '*.tfvars.example'
+      - 'userdata.sh'
+      - '.github/workflows/terraform-plan.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      terraform: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            terraform:
+              - '*.tf'
+              - '*.tfvars.example'
+              - 'userdata.sh'
+
+  terraform-plan:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform Init
+        run: terraform init
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        if: needs.detect-changes.outputs.terraform == 'true'
+        run: terraform plan -no-color -input=false
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_digitalocean_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_allowed_ssh_cidrs: '["0.0.0.0/0"]'
+
+      - name: Skip Notice
+        if: needs.detect-changes.outputs.terraform != 'true'
+        run: echo "No Terraform changes detected — plan skipped"
+
+  # Pass-through job for branch protection status checks
+  plan-status:
+    if: always()
+    needs: [terraform-plan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check plan result
+        run: |
+          if [ "${{ needs.terraform-plan.result }}" = "failure" ]; then
+            echo "Terraform plan failed"
+            exit 1
+          fi
+          echo "Terraform plan passed"
