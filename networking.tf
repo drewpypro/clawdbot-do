@@ -22,38 +22,47 @@ resource "digitalocean_firewall" "droplet_fw" {
     source_addresses = var.allowed_ssh_cidrs
   }
 
-  # HTTP/HTTPS inbound (optional — remove if not needed)
-  inbound_rule {
-    protocol         = "tcp"
-    port_range       = "80"
-    source_addresses = ["0.0.0.0/0", "::/0"]
-  }
-
-  inbound_rule {
-    protocol         = "tcp"
-    port_range       = "443"
-    source_addresses = ["0.0.0.0/0", "::/0"]
-  }
-
-  # ICMP (ping)
+  # ICMP (ping) — restricted to allowed CIDRs
   inbound_rule {
     protocol         = "icmp"
     source_addresses = var.allowed_ssh_cidrs
   }
 
-  # All outbound
+  # Outbound — HTTPS only (API calls, package updates, Discord WebSocket)
   outbound_rule {
     protocol              = "tcp"
-    port_range            = "all"
+    port_range            = "443"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Outbound — HTTP (package repos that use HTTP)
+  outbound_rule {
+    protocol              = "tcp"
+    port_range            = "80"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Outbound — DNS
+  outbound_rule {
+    protocol              = "udp"
+    port_range            = "53"
     destination_addresses = ["0.0.0.0/0", "::/0"]
   }
 
   outbound_rule {
-    protocol              = "udp"
-    port_range            = "all"
+    protocol              = "tcp"
+    port_range            = "53"
     destination_addresses = ["0.0.0.0/0", "::/0"]
   }
 
+  # Outbound — NTP
+  outbound_rule {
+    protocol              = "udp"
+    port_range            = "123"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Outbound — ICMP
   outbound_rule {
     protocol              = "icmp"
     destination_addresses = ["0.0.0.0/0", "::/0"]
