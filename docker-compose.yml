@@ -1,7 +1,10 @@
 ###############################################################################
 # Docker Compose — LiteLLM + OpenClaw Multi-Agent Stack
-# Spin up/down as needed: docker compose up -d / docker compose down
+# Deploy with: docker stack deploy -c docker-compose.yml bogoyito
+# Requires: docker swarm init (for secrets support)
 ###############################################################################
+
+version: "3.9"
 
 services:
   ###########################################################################
@@ -9,14 +12,21 @@ services:
   ###########################################################################
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
-    container_name: litellm
-    restart: unless-stopped
     ports:
       - "127.0.0.1:4000:4000"
     volumes:
       - ./config/litellm.yaml:/app/config.yaml:ro
-    env_file:
-      - .env
+    secrets:
+      - anthropic_api_key
+      - litellm_master_key
+      # Uncomment as needed:
+      # - openai_api_key
+      # - google_api_key
+    environment:
+      - ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic_api_key
+      - LITELLM_MASTER_KEY_FILE=/run/secrets/litellm_master_key
+      # - OPENAI_API_KEY_FILE=/run/secrets/openai_api_key
+      # - GOOGLE_API_KEY_FILE=/run/secrets/google_api_key
     command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
@@ -24,46 +34,65 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
 
   ###########################################################################
   # Bogoyito — Discord chat agent
   ###########################################################################
   bogoyito-chat:
-    build:
-      context: ./openclaw
-      dockerfile: Dockerfile
-    container_name: bogoyito-chat
-    restart: unless-stopped
+    image: bogoyito:latest
     depends_on:
-      litellm:
-        condition: service_healthy
+      - litellm
     volumes:
       - ./config/chat.json:/home/clawdbot/.openclaw/config.json:ro
       - bogoyito-chat-data:/home/clawdbot/.openclaw/workspace
-    env_file:
-      - .env
+    secrets:
+      - discord_bot_token
     environment:
       - OPENCLAW_CONFIG=/home/clawdbot/.openclaw/config.json
+      - DISCORD_BOT_TOKEN_FILE=/run/secrets/discord_bot_token
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
 
   ###########################################################################
   # Bogoyito — Security/vuln alert agent
   ###########################################################################
   bogoyito-security:
-    build:
-      context: ./openclaw
-      dockerfile: Dockerfile
-    container_name: bogoyito-security
-    restart: unless-stopped
+    image: bogoyito:latest
     depends_on:
-      litellm:
-        condition: service_healthy
+      - litellm
     volumes:
       - ./config/security.json:/home/clawdbot/.openclaw/config.json:ro
       - bogoyito-security-data:/home/clawdbot/.openclaw/workspace
-    env_file:
-      - .env
+    secrets:
+      - discord_bot_token
     environment:
       - OPENCLAW_CONFIG=/home/clawdbot/.openclaw/config.json
+      - DISCORD_BOT_TOKEN_FILE=/run/secrets/discord_bot_token
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
+
+###############################################################################
+# Secrets — created externally via pipeline (never stored in repo)
+###############################################################################
+secrets:
+  anthropic_api_key:
+    external: true
+  litellm_master_key:
+    external: true
+  discord_bot_token:
+    external: true
+  # openai_api_key:
+  #   external: true
+  # google_api_key:
+  #   external: true
 
 volumes:
   bogoyito-chat-data:

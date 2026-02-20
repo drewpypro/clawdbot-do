@@ -1,6 +1,6 @@
 # clawdbot-do
 
-DigitalOcean infrastructure for deploying a remote OpenClaw + LiteLLM multi-agent stack. Full bootstrap — `terraform apply` gives you a hardened droplet with Docker Compose running multiple Bogoyito agents through a unified LiteLLM model gateway.
+DigitalOcean infrastructure for deploying a remote OpenClaw + LiteLLM multi-agent stack. Full bootstrap — `terraform apply` gives you a hardened droplet with Docker Swarm ready for secure secret injection. No API keys on disk. Ever.
 
 ## Architecture
 
@@ -13,6 +13,11 @@ flowchart TB
         Gemini["Google Gemini API"]
     end
 
+    subgraph GH["GitHub"]
+        Secrets["GitHub Secrets\n(encrypted at rest)"]
+        Pipeline["Actions Pipeline"]
+    end
+
     subgraph DO["DigitalOcean Project"]
         subgraph FW["Firewall"]
             direction TB
@@ -22,23 +27,30 @@ flowchart TB
 
         subgraph VPC["VPC 10.10.10.0/24"]
             subgraph Droplet["Droplet (Debian 13)"]
-                subgraph Docker["Docker Compose Stack"]
-                    LiteLLM["LiteLLM Proxy\n:4000\n(model router)"]
+                subgraph Swarm["Docker Swarm (single-node)"]
+                    Raft["Raft Store\n(secrets encrypted)"]
                     
-                    subgraph Agents["Bogoyito Agents"]
-                        Chat["bogoyito-chat\n(Discord social)"]
-                        Security["bogoyito-security\n(vuln alerts)"]
-                        More["bogoyito-...\n(add more)"]
+                    subgraph Stack["bogoyito stack"]
+                        LiteLLM["LiteLLM Proxy\n:4000\n(model router)"]
+                        
+                        subgraph Agents["Bogoyito Agents"]
+                            Chat["bogoyito-chat\n(Discord social)"]
+                            Security["bogoyito-security\n(vuln alerts)"]
+                            More["bogoyito-...\n(add more)"]
+                        end
                     end
                 end
 
-                UFW["UFW + fail2ban\n(defense in depth)"]
+                UFW["UFW + fail2ban"]
                 Updates["unattended-upgrades"]
             end
         end
     end
 
-    User["Admin SSH"] --> FW_IN --> Droplet
+    Secrets --> Pipeline
+    Pipeline -->|"SSH + docker secret create"| Raft
+    Raft -->|"/run/secrets/* (tmpfs)"| LiteLLM
+    Raft -->|"/run/secrets/* (tmpfs)"| Chat
     
     Chat --> LiteLLM
     Security --> LiteLLM
@@ -52,6 +64,34 @@ flowchart TB
     Security --> Discord
 ```
 
+### Secrets Flow
+
+```mermaid
+sequenceDiagram
+    participant GH as GitHub Secrets
+    participant GA as GitHub Actions
+    participant SSH as SSH Tunnel
+    participant SW as Docker Swarm
+    participant R as Raft Store (encrypted)
+    participant C as Container
+
+    Note over GH: Keys stored encrypted in GitHub
+    
+    GA->>GH: Read secrets
+    GA->>SSH: SSH to droplet
+    SSH->>SW: echo "$KEY" | docker secret create name -
+    SW->>R: Encrypt + store in Raft log
+    
+    Note over R: ✅ Encrypted at rest (node key)
+    Note over SSH: Pipe closed — key not on disk
+    
+    SW->>C: Mount /run/secrets/name (tmpfs)
+    Note over C: ✅ Memory only — never touches disk
+    C->>C: App reads secret from tmpfs
+    
+    Note over C: Container stops → tmpfs gone
+```
+
 ### Bootstrap Flow
 
 ```mermaid
@@ -60,31 +100,29 @@ sequenceDiagram
     participant TF as Terraform
     participant DO as DigitalOcean
     participant D as Droplet
+    participant GA as GitHub Actions
 
     U->>TF: terraform apply
     TF->>DO: Create VPC + Firewall
     TF->>DO: Create Droplet
     DO->>D: Boot + run userdata.sh
     
-    Note over D: System Updates
-    D->>D: apt upgrade + security packages
-    D->>D: SSH hardening + UFW + fail2ban
+    Note over D: System hardening
+    D->>D: apt upgrade + SSH hardening
+    D->>D: UFW + fail2ban
     
-    Note over D: User Setup
+    Note over D: Stack setup
     D->>D: Create clawdbot user
-    D->>D: Install Docker + Docker Compose
+    D->>D: Install Docker
+    D->>D: docker swarm init
+    D->>D: Build bogoyito image
     
-    Note over D: Stack Deployment
-    D->>D: Clone config templates
-    D->>D: docker compose build
-    D->>D: Write SETUP.md
+    Note over D: ✅ Ready for secrets
+    U->>GA: Run "Deploy Secrets" workflow
+    GA->>D: SSH: docker secret create (x3)
+    GA->>D: SSH: docker stack deploy
     
-    Note over D: Ready!
-    U->>D: SSH in
-    U->>D: Edit .env (API keys)
-    U->>D: docker compose up -d
-    D->>D: LiteLLM healthcheck passes
-    D->>D: Bogoyitos connect to Discord
+    Note over D: 🚀 Bogoyitos online!
 ```
 
 ## Quick Start
@@ -96,17 +134,15 @@ cd clawdbot-do
 
 # Configure
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
+# Edit terraform.tfvars
 
-# Deploy
+# Deploy infrastructure
 terraform init
 terraform plan
 terraform apply
 
-# SSH in and finish setup
-ssh root@$(terraform output -raw droplet_ip)
-su - clawdbot
-cat ~/SETUP.md
+# Then run "Deploy Secrets" workflow from GitHub Actions
+# Or SSH in and follow ~/SETUP.md for manual setup
 ```
 
 ## Project Structure
@@ -115,16 +151,16 @@ cat ~/SETUP.md
 clawdbot-do/
 ├── .github/workflows/
 │   ├── terraform-plan.yaml      # PR → format + validate + plan
-│   ├── terraform-build.yaml     # Push to main → apply
-│   └── terraform-destroy.yaml   # Manual → destroy
+│   ├── terraform-build.yaml     # Push to main → apply infra
+│   ├── terraform-destroy.yaml   # Manual → destroy infra
+│   └── deploy-secrets.yaml      # Manual → push secrets + deploy stack
 ├── config/
 │   ├── litellm.yaml             # LiteLLM model routing config
 │   ├── chat.json                # Chat agent OpenClaw config
 │   └── security.json            # Security agent OpenClaw config
 ├── openclaw/
 │   └── Dockerfile               # OpenClaw container image
-├── docker-compose.yml           # Full stack definition
-├── .env.example                 # API key template
+├── docker-compose.yml           # Stack definition (Swarm mode)
 ├── droplet.tf                   # Droplet + SSH key
 ├── networking.tf                # VPC + firewall rules
 ├── project.tf                   # DO project
@@ -149,70 +185,68 @@ clawdbot-do/
 2. Add a service to `docker-compose.yml`:
 ```yaml
   bogoyito-newagent:
-    build:
-      context: ./openclaw
-      dockerfile: Dockerfile
-    container_name: bogoyito-newagent
-    restart: unless-stopped
+    image: bogoyito:latest
     depends_on:
-      litellm:
-        condition: service_healthy
+      - litellm
     volumes:
       - ./config/newagent.json:/home/clawdbot/.openclaw/config.json:ro
       - bogoyito-newagent-data:/home/clawdbot/.openclaw/workspace
-    env_file:
-      - .env
+    secrets:
+      - discord_bot_token
+    environment:
+      - DISCORD_BOT_TOKEN_FILE=/run/secrets/discord_bot_token
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
 ```
 
-3. `docker compose up -d bogoyito-newagent`
-
-Each bogoyito is isolated — its own workspace, memory, and personality. They all route through LiteLLM for model access.
+3. `docker stack deploy -c docker-compose.yml bogoyito`
 
 ## CI/CD Workflows
 
 | Workflow | Trigger | Action |
 |----------|---------|--------|
 | `terraform-plan.yaml` | PR to main | Format check, validate, plan |
-| `terraform-build.yaml` | Push to main | Apply (requires `production` environment) |
-| `terraform-destroy.yaml` | Manual dispatch | Destroy (requires `destroy` environment + confirmation) |
+| `terraform-build.yaml` | Push to main | Apply infra |
+| `terraform-destroy.yaml` | Manual dispatch | Destroy infra |
+| `deploy-secrets.yaml` | Manual dispatch | Push secrets + deploy stack |
 
-### Required Secrets
+### Required GitHub Secrets
 
-- `DIGITALOCEAN_TOKEN` — DO API token
-- `SSH_PUBLIC_KEY` — Public SSH key for droplet access
-- `ALLOWED_SSH_CIDR` — Your IP CIDR for SSH access
+| Secret | Purpose |
+|--------|---------|
+| `DIGITALOCEAN_TOKEN` | DO API token (Terraform) |
+| `SSH_PUBLIC_KEY` | Droplet SSH access |
+| `SSH_PRIVATE_KEY` | Pipeline SSH to droplet |
+| `DROPLET_IP` | Droplet public IP |
+| `ALLOWED_SSH_CIDR` | SSH access CIDR |
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `LITELLM_MASTER_KEY` | LiteLLM admin key |
+| `DISCORD_BOT_TOKEN` | Discord bot token |
 
 ### Required Environments
 
-- `production` — For apply workflow (recommended: require reviewers)
+- `production` — For apply + deploy workflows (recommended: require reviewers)
 - `destroy` — For destroy workflow (recommended: require reviewers)
-
-## Post-Deploy Setup
-
-After `terraform apply`:
-
-```bash
-ssh root@<droplet_ip>
-su - clawdbot
-cat ~/SETUP.md    # Follow the guide
-```
-
-1. Copy `.env.example` to `.env` and populate API keys
-2. Review configs in `config/` — enable/disable models in `litellm.yaml`
-3. `docker compose up -d` — starts LiteLLM + all bogoyitos
-4. Verify: `docker compose ps` and `curl http://localhost:4000/health`
 
 ## Security
 
-- **No inbound web ports** — SSH only, restricted to specified CIDRs
+**Secrets:**
+- No `.env` files — all secrets via Docker Swarm encrypted Raft store
+- Secrets injected via SSH pipeline (GitHub → SSH pipe → `docker secret create`)
+- Containers read from `/run/secrets/*` (tmpfs — memory only, never on disk)
+- Secret rotation via workflow dispatch with `rotate=true`
+
+**Infrastructure:**
+- No inbound web ports — SSH only, restricted to specified CIDRs
 - SSH key-only authentication (password auth disabled)
 - DO firewall + UFW (defense in depth)
 - fail2ban for brute-force protection
 - Automatic security updates via unattended-upgrades
-- Outbound restricted to HTTPS, HTTP, DNS, NTP (no arbitrary ports)
+- Outbound restricted to HTTPS, HTTP, DNS, NTP
 - LiteLLM binds to localhost only (127.0.0.1:4000)
-- All secrets in `.env` (never committed — in `.gitignore`)
-- Each bogoyito runs in its own container with isolated workspace
+- Each bogoyito in isolated container with own workspace
 
 ## Cost Estimate
 
@@ -222,11 +256,11 @@ cat ~/SETUP.md    # Follow the guide
 | VPC / Firewall / Monitoring | Free |
 | **Total** | **~$6/mo** |
 
-> **Note:** For multiple agents, consider bumping to `s-2vcpu-2gb` (~$12/mo). Each OpenClaw instance + LiteLLM proxy adds ~200-400MB RAM overhead.
+> For multiple agents, consider `s-2vcpu-2gb` (~$12/mo).
 
 ## Inspiration
 
-Bootstrap-and-test pattern derived from:
-- [`drewpypro/aws-privatelink-protocol-tester`](https://github.com/drewpypro/aws-privatelink-protocol-tester) — full test environment via userdata
-- [`drewpypro/aws-vpce-policy-tester`](https://github.com/drewpypro/aws-vpce-policy-tester) — automated test harness on apply
-- [`drewpypro/aws-backbone-routing-tester`](https://github.com/drewpypro/aws-backbone-routing-tester) — multi-instance bootstrap with scripts
+Bootstrap pattern derived from:
+- [`drewpypro/aws-privatelink-protocol-tester`](https://github.com/drewpypro/aws-privatelink-protocol-tester)
+- [`drewpypro/aws-vpce-policy-tester`](https://github.com/drewpypro/aws-vpce-policy-tester)
+- [`drewpypro/aws-backbone-routing-tester`](https://github.com/drewpypro/aws-backbone-routing-tester)

@@ -55,24 +55,33 @@ useradd -m -s /bin/bash clawdbot
 usermod -aG docker clawdbot
 
 ###############################################################################
-# Deploy Docker Compose stack
+# Initialize Docker Swarm (single-node — for secrets support only)
+###############################################################################
+docker swarm init --advertise-addr 127.0.0.1 2>&1 || echo "Swarm already initialized"
+
+###############################################################################
+# Deploy stack directory
 ###############################################################################
 DEPLOY_DIR="/home/clawdbot/bogoyito-stack"
 mkdir -p "$DEPLOY_DIR"/{config,openclaw}
 
 # --- docker-compose.yml ---
 cat > "$DEPLOY_DIR/docker-compose.yml" << 'COMPOSE_EOF'
+version: "3.9"
+
 services:
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
-    container_name: litellm
-    restart: unless-stopped
     ports:
       - "127.0.0.1:4000:4000"
     volumes:
       - ./config/litellm.yaml:/app/config.yaml:ro
-    env_file:
-      - .env
+    secrets:
+      - anthropic_api_key
+      - litellm_master_key
+    environment:
+      - ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic_api_key
+      - LITELLM_MASTER_KEY_FILE=/run/secrets/litellm_master_key
     command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
@@ -80,40 +89,52 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
 
   bogoyito-chat:
-    build:
-      context: ./openclaw
-      dockerfile: Dockerfile
-    container_name: bogoyito-chat
-    restart: unless-stopped
+    image: bogoyito:latest
     depends_on:
-      litellm:
-        condition: service_healthy
+      - litellm
     volumes:
       - ./config/chat.json:/home/clawdbot/.openclaw/config.json:ro
       - bogoyito-chat-data:/home/clawdbot/.openclaw/workspace
-    env_file:
-      - .env
+    secrets:
+      - discord_bot_token
     environment:
       - OPENCLAW_CONFIG=/home/clawdbot/.openclaw/config.json
+      - DISCORD_BOT_TOKEN_FILE=/run/secrets/discord_bot_token
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
 
   bogoyito-security:
-    build:
-      context: ./openclaw
-      dockerfile: Dockerfile
-    container_name: bogoyito-security
-    restart: unless-stopped
+    image: bogoyito:latest
     depends_on:
-      litellm:
-        condition: service_healthy
+      - litellm
     volumes:
       - ./config/security.json:/home/clawdbot/.openclaw/config.json:ro
       - bogoyito-security-data:/home/clawdbot/.openclaw/workspace
-    env_file:
-      - .env
+    secrets:
+      - discord_bot_token
     environment:
       - OPENCLAW_CONFIG=/home/clawdbot/.openclaw/config.json
+      - DISCORD_BOT_TOKEN_FILE=/run/secrets/discord_bot_token
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
+
+secrets:
+  anthropic_api_key:
+    external: true
+  litellm_master_key:
+    external: true
+  discord_bot_token:
+    external: true
 
 volumes:
   bogoyito-chat-data:
@@ -147,16 +168,6 @@ model_list:
     litellm_params:
       model: anthropic/claude-sonnet-4-20250514
       api_key: "os.environ/ANTHROPIC_API_KEY"
-
-  # Uncomment when keys are set:
-  # - model_name: gpt-4o
-  #   litellm_params:
-  #     model: openai/gpt-4o
-  #     api_key: "os.environ/OPENAI_API_KEY"
-  # - model_name: gemini-pro
-  #   litellm_params:
-  #     model: gemini/gemini-2.5-pro
-  #     api_key: "os.environ/GOOGLE_API_KEY"
 
 general_settings:
   master_key: "os.environ/LITELLM_MASTER_KEY"
@@ -195,21 +206,9 @@ cat > "$DEPLOY_DIR/config/security.json" << 'SEC_EOF'
 }
 SEC_EOF
 
-# --- .env placeholder ---
-cat > "$DEPLOY_DIR/.env" << 'ENV_EOF'
-# Populate these after deployment
-# ANTHROPIC_API_KEY=sk-ant-...
-# OPENAI_API_KEY=sk-...
-# GOOGLE_API_KEY=AI...
-LITELLM_MASTER_KEY=sk-litellm-changeme
-# DISCORD_BOT_TOKEN=...
-ENV_EOF
-
-chmod 600 "$DEPLOY_DIR/.env"
-
-# --- Pre-build the OpenClaw image ---
+# --- Build the OpenClaw image ---
 cd "$DEPLOY_DIR"
-docker compose build 2>&1 || echo "Docker build failed — will retry on first 'up'"
+docker build -t bogoyito:latest ./openclaw 2>&1 || echo "Docker build failed — will retry on deploy"
 
 ###############################################################################
 # MOTD Banner
@@ -227,7 +226,11 @@ cat > /etc/motd << 'BANNER_EOF'
 
   Stack:    /home/clawdbot/bogoyito-stack
   Setup:    su - clawdbot && cat ~/SETUP.md
-  Status:   docker compose -f ~/bogoyito-stack/docker-compose.yml ps
+  Secrets:  docker secret ls
+  Services: docker stack services bogoyito
+
+  Secrets are injected via GitHub Actions pipeline.
+  No API keys are stored on disk.
 
 BANNER_EOF
 
@@ -237,50 +240,60 @@ BANNER_EOF
 cat > /home/clawdbot/SETUP.md << 'SETUP_EOF'
 # Bogoyito Stack — Post-Deployment Setup
 
-## 1. Configure secrets
+## Architecture
+Secrets flow: GitHub Secrets → SSH pipeline → Docker Swarm (encrypted Raft)
+Containers read secrets from /run/secrets/* (tmpfs, never on disk)
+
+## 1. Verify Swarm is running
+```bash
+docker node ls
+```
+
+## 2. Inject secrets (via GitHub Actions)
+Run the "Deploy Secrets" workflow from GitHub Actions.
+It will SSH in and create Docker secrets + deploy the stack.
+
+Or manually (for testing):
+```bash
+echo "sk-ant-..." | docker secret create anthropic_api_key -
+echo "sk-litellm-..." | docker secret create litellm_master_key -
+echo "discord-token..." | docker secret create discord_bot_token -
+```
+
+## 3. Deploy the stack
 ```bash
 cd ~/bogoyito-stack
-vim .env
-# Add your API keys (ANTHROPIC_API_KEY, DISCORD_BOT_TOKEN, etc.)
-# Change LITELLM_MASTER_KEY to something secure
-```
-
-## 2. Review agent configs
-```bash
-ls config/
-# litellm.yaml  — model routing (uncomment models as needed)
-# chat.json     — Discord chat agent config
-# security.json — Vuln alert agent config
-```
-
-## 3. Start the stack
-```bash
-docker compose up -d
+docker stack deploy -c docker-compose.yml bogoyito
 ```
 
 ## 4. Verify
 ```bash
-docker compose ps
-docker compose logs litellm    # Check LiteLLM is healthy
-docker compose logs bogoyito-chat  # Check agent started
+docker stack services bogoyito
+docker secret ls
+docker service logs bogoyito_litellm
+docker service logs bogoyito_bogoyito-chat
 curl http://localhost:4000/health
 ```
 
-## 5. Add a new agent
-1. Create `config/newagent.json`
-2. Add service to `docker-compose.yml` (see README)
-3. `docker compose up -d bogoyito-newagent`
-
 ## Commands
 ```bash
-docker compose ps              # Status
-docker compose logs -f         # Stream all logs
-docker compose restart         # Restart everything
-docker compose down            # Stop everything
-docker compose up -d           # Start everything
+docker stack services bogoyito     # Service status
+docker stack ps bogoyito           # Task status
+docker service logs -f <service>   # Stream logs
+docker stack rm bogoyito           # Tear down
+docker stack deploy -c docker-compose.yml bogoyito  # Redeploy
+```
+
+## Secret Rotation
+Run "Deploy Secrets" workflow with rotate=true, or manually:
+```bash
+docker secret rm anthropic_api_key
+echo "new-key" | docker secret create anthropic_api_key -
+docker service update --force bogoyito_litellm
 ```
 SETUP_EOF
 
 chown -R clawdbot:clawdbot /home/clawdbot/
 
 echo "=== Bootstrap complete — $(date) ==="
+echo "Swarm initialized. Run 'Deploy Secrets' workflow to inject keys and start stack."
