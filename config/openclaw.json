@@ -31,7 +31,17 @@
   },
   "channels": {
     "discord": {
-      "token": "${DISCORD_BOT_TOKEN}"
+      "token": "${DISCORD_BOT_TOKEN}",
+      "groupPolicy": "allowlist",
+      "guilds": {
+        "${DISCORD_GUILD_ID}": {
+          "channels": {
+            "${DISCORD_CHANNEL_BOTS}": { "enabled": true },
+            "${DISCORD_CHANNEL_TEST}": { "enabled": true }
+          }
+        }
+      },
+      "dmPolicy": "disabled"
     }
   },
   "gateway": {
