@@ -28,7 +28,7 @@ sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd
 sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config
 sed -i 's/^#\?X11Forwarding.*/X11Forwarding no/' /etc/ssh/sshd_config
 # Allow both root (for now) and clawdbot
-echo "AllowUsers root clawdbot" >> /etc/ssh/sshd_config
+grep -q '^AllowUsers' /etc/ssh/sshd_config || echo "AllowUsers root clawdbot" >> /etc/ssh/sshd_config
 systemctl restart sshd
 
 # --- clawdbot user ---
@@ -42,26 +42,20 @@ chown -R clawdbot:clawdbot /home/clawdbot/.ssh
 chmod 700 /home/clawdbot/.ssh
 chmod 600 /home/clawdbot/.ssh/authorized_keys
 
-# --- Node.js 22 (for OpenClaw) ---
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt-get install -y nodejs
-
 # --- Clone repo for app-layer config ---
 su - clawdbot -c "git clone https://github.com/drewpypro/clawdbot-do.git /home/clawdbot/clawdbot-do"
 
 # --- Custom MOTD ---
 cat > /etc/motd << 'MOTD'
 
-  ____                              
- | __ )  ___   __ _  ___  _   _    
- |  _ \ / _ \ / _` |/ _ \| | | |   
- | |_) | (_) | (_| | (_) | |_| |   
- |____/ \___/ \__, |\___/ \__, |   
-              |___/       |___/    
-                                    
-  🤖 Bogoyito — DO Agent Node
-  Managed by: drewpypro/clawdbot-do
-  
+  ╔══════════════════════════════════════╗
+  ║                                      ║
+  ║   (o_O)  BOGOYITO ONLINE             ║
+  ║   <| |>  DO Agent Node               ║
+  ║    / \   drewpypro/clawdbot-do       ║
+  ║                                      ║
+  ╚══════════════════════════════════════╝
+
 MOTD
 
 echo "=== Bootstrap complete — $(date) ==="
