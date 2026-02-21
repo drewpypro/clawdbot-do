@@ -1,0 +1,17 @@
+{
+  "$schema": "https://docs.openclaw.ai/config-schema.json",
+  "model": {
+    "provider": "litellm",
+    "name": "claude-sonnet-4",
+    "baseUrl": "http://litellm:4000"
+  },
+  "channels": {
+    "discord": {
+      "enabled": true
+    }
+  },
+  "agent": {
+    "name": "bogoyito-chat",
+    "description": "Bogoyito chat agent — DO deployment"
+  }
+}
