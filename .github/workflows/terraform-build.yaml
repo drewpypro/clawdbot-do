@@ -6,8 +6,10 @@ on:
       - main
     paths:
       - '*.tf'
-      - 'config/'
-      - 'openclaw/'
+      - 'userdata.sh'
+      - 'docker-compose.yml'
+      - 'config/**'
+      - 'openclaw/**'
 
 concurrency:
   group: terraform
