@@ -3,6 +3,7 @@ set -euo pipefail
 LOG="/var/log/userdata.log"
 exec > >(tee -a "$LOG") 2>&1
 echo "=== Bootstrap started — $(date) ==="
+export DEBIAN_FRONTEND=noninteractive
 
 # --- System updates ---
 apt-get update -y && apt-get upgrade -y
