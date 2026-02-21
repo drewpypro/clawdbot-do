@@ -20,8 +20,6 @@ resource "digitalocean_droplet" "clawdbot" {
 
   user_data = file("${path.module}/userdata.sh")
 
-  tags = ["clawdbot", "phase1"]
-
   lifecycle {
     ignore_changes = [image]
   }
