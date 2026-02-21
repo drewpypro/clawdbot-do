@@ -27,10 +27,35 @@ dpkg-reconfigure -plow unattended-upgrades
 sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 sed -i 's/^#\?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config
 sed -i 's/^#\?X11Forwarding.*/X11Forwarding no/' /etc/ssh/sshd_config
+# Allow both root (for now) and clawdbot
+grep -q '^AllowUsers' /etc/ssh/sshd_config || echo "AllowUsers root clawdbot" >> /etc/ssh/sshd_config
 systemctl restart sshd
 
 # --- clawdbot user ---
 useradd -m -s /bin/bash clawdbot
 usermod -aG docker clawdbot
+
+# --- Propagate SSH key to clawdbot user ---
+mkdir -p /home/clawdbot/.ssh
+cp /root/.ssh/authorized_keys /home/clawdbot/.ssh/authorized_keys
+chown -R clawdbot:clawdbot /home/clawdbot/.ssh
+chmod 700 /home/clawdbot/.ssh
+chmod 600 /home/clawdbot/.ssh/authorized_keys
+
+# --- Clone repo for app-layer config ---
+su - clawdbot -c "git clone https://github.com/drewpypro/clawdbot-do.git /home/clawdbot/clawdbot-do"
+
+# --- Custom MOTD ---
+cat > /etc/motd << 'MOTD'
+
+  ╔══════════════════════════════════════╗
+  ║                                      ║
+  ║   (o_O)  BOGOYITO ONLINE             ║
+  ║   <| |>  DO Agent Node               ║
+  ║    / \   drewpypro/clawdbot-do       ║
+  ║                                      ║
+  ╚══════════════════════════════════════╝
+
+MOTD
 
 echo "=== Bootstrap complete — $(date) ==="
