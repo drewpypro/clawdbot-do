@@ -6,7 +6,9 @@ RUN apt-get update && apt-get install -y curl git && rm -rf /var/lib/apt/lists/*
     mkdir -p /home/clawdbot/.openclaw/workspace && \
     chown -R clawdbot:clawdbot /home/clawdbot
 
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
 USER clawdbot
 WORKDIR /home/clawdbot
 
-CMD ["openclaw", "gateway", "start", "--foreground"]
+ENTRYPOINT ["entrypoint.sh"]

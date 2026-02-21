@@ -30,7 +30,9 @@
     }
   },
   "channels": {
-    "discord": {}
+    "discord": {
+      "token": "${DISCORD_BOT_TOKEN}"
+    }
   },
   "gateway": {
     "mode": "local",
