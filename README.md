@@ -24,6 +24,9 @@ DigitalOcean infrastructure for Bogoyito — containerized OpenClaw agents.
 | `ANTHROPIC_API_KEY` | Anthropic API key for LiteLLM |
 | `LITELLM_MASTER_KEY` | LiteLLM admin key (generate: `openssl rand -hex 32`) |
 | `DISCORD_BOT_TOKEN_CHAT` | Discord bot token for bogoyito-chat |
+| `DISCORD_GUILD_ID` | Discord server/guild ID |
+| `DISCORD_CHANNEL_BOTS` | #bots channel ID |
+| `DISCORD_CHANNEL_TEST` | Test channel ID |
 
 ## Deploy (Phase 2)
 
@@ -38,6 +41,9 @@ cat > .env << 'EOF'
 ANTHROPIC_API_KEY=sk-ant-...
 LITELLM_MASTER_KEY=sk-litellm-...
 DISCORD_BOT_TOKEN_CHAT=...
+DISCORD_GUILD_ID=...
+DISCORD_CHANNEL_BOTS=...
+DISCORD_CHANNEL_TEST=...
 EOF
 chmod 600 .env
 

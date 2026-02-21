@@ -22,10 +22,14 @@ services:
         condition: service_healthy
     volumes:
       - ./config/openclaw.json:/config/openclaw.json:ro
-      - bogoyito-chat-data:/home/clawdbot/.openclaw/workspace
+      - ./workspace:/defaults/workspace:ro
+      - bogoyito-chat-data:/home/clawdbot/.openclaw
     env_file: .env
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN_CHAT}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
+      - DISCORD_CHANNEL_BOTS=${DISCORD_CHANNEL_BOTS}
+      - DISCORD_CHANNEL_TEST=${DISCORD_CHANNEL_TEST}
     restart: unless-stopped
 
 volumes:
