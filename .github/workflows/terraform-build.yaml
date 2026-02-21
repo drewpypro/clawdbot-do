@@ -1,6 +1,7 @@
 name: terraform build workflow
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
