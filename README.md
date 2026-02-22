@@ -7,7 +7,7 @@ DigitalOcean infrastructure for the bogoylito fleet — containerized OpenClaw a
 | Agent | Model | Purpose | Channel |
 |-------|-------|---------|---------|
 | **bogoylito-chat** | Sonnet 4 | General chat bot | #bots, #bot_fight |
-| **bantay** | Haiku 3.5 | Security monitoring | #security, #bot_fight |
+| **bantay** | Opus 4 | Security monitoring | #security, #bot_fight |
 
 ## Required Secrets
 
