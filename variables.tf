@@ -11,7 +11,7 @@ variable "do_region" {
 variable "droplet_size" {
   type        = string
   description = "Droplet size slug"
-  default     = "s-1vcpu-2gb"
+  default     = "s-2vcpu-4gb"
 }
 
 variable "droplet_image" {
