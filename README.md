@@ -6,8 +6,8 @@ DigitalOcean infrastructure for the bogoylito fleet — containerized OpenClaw a
 
 | Agent | Model | Purpose | Channel |
 |-------|-------|---------|---------|
-| **bogoylito-chat** | Sonnet 4 | General chat bot | #bots, #test |
-| **bantay** | Haiku 3.5 | Security monitoring | #security, #bots |
+| **bogoylito-chat** | Sonnet 4 | General chat bot | #bots, #bot_fight |
+| **bantay** | Haiku 3.5 | Security monitoring | #security, #bot_fight |
 
 ## Required Secrets
 
@@ -34,8 +34,8 @@ DigitalOcean infrastructure for the bogoylito fleet — containerized OpenClaw a
 | `DISCORD_BOT_TOKEN_SECURITY` | Discord bot token for bantay |
 | `DISCORD_GUILD_ID` | Discord server/guild ID |
 | `DISCORD_CHANNEL_BOTS` | #bots channel ID |
-| `DISCORD_CHANNEL_TEST` | Test channel ID |
 | `DISCORD_CHANNEL_SECURITY` | #security channel ID |
+| `DISCORD_CHANNEL_BOTFIGHT` | #bot_fight channel ID |
 
 ## Deploy (Phase 3)
 
@@ -53,8 +53,8 @@ DISCORD_BOT_TOKEN_CHAT=...
 DISCORD_BOT_TOKEN_SECURITY=...
 DISCORD_GUILD_ID=...
 DISCORD_CHANNEL_BOTS=...
-DISCORD_CHANNEL_TEST=...
 DISCORD_CHANNEL_SECURITY=...
+DISCORD_CHANNEL_BOTFIGHT=...
 EOF
 chmod 600 .env
 

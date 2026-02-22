@@ -37,7 +37,7 @@
         "${DISCORD_GUILD_ID}": {
           "channels": {
             "${DISCORD_CHANNEL_SECURITY}": { "enabled": true },
-            "${DISCORD_CHANNEL_BOTS}": { "enabled": true }
+            "${DISCORD_CHANNEL_BOTFIGHT}": { "enabled": true }
           }
         }
       },
