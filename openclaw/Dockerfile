@@ -1,6 +1,6 @@
 FROM node:22-slim
 
-RUN apt-get update && apt-get install -y curl git && rm -rf /var/lib/apt/lists/* && \
+RUN apt-get update && apt-get install -y curl git python3 make g++ libopus-dev && rm -rf /var/lib/apt/lists/* && \
     useradd -m -s /bin/bash clawdbot && \
     npm install -g openclaw && \
     mkdir -p /home/clawdbot/.openclaw/workspace && \
