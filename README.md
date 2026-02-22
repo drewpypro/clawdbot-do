@@ -1,6 +1,13 @@
 # clawdbot-do
 
-DigitalOcean infrastructure for Bogoyito — containerized OpenClaw agents.
+DigitalOcean infrastructure for the bogoylito fleet — containerized OpenClaw agents.
+
+## Agents
+
+| Agent | Model | Purpose | Channel |
+|-------|-------|---------|---------|
+| **bogoylito-chat** | Sonnet 4 | General chat bot | #bots, #test |
+| **bantay** | Haiku 3.5 | Security monitoring | #security, #bots |
 
 ## Required Secrets
 
@@ -17,18 +24,20 @@ DigitalOcean infrastructure for Bogoyito — containerized OpenClaw agents.
 | `BUCKET_ACCESS_KEY_ID` | Spaces/R2 access key |
 | `BUCKET_SECRET_ACCESS_KEY` | Spaces/R2 secret key |
 
-### Droplet `.env` (Phase 2 — manual, temporary)
+### Droplet `.env` (Phase 2-3 — manual, temporary)
 
 | Variable | Purpose |
 |----------|---------|
 | `ANTHROPIC_API_KEY` | Anthropic API key for LiteLLM |
 | `LITELLM_MASTER_KEY` | LiteLLM admin key (generate: `openssl rand -hex 32`) |
-| `DISCORD_BOT_TOKEN_CHAT` | Discord bot token for bogoyito-chat |
+| `DISCORD_BOT_TOKEN_CHAT` | Discord bot token for bogoylito-chat |
+| `DISCORD_BOT_TOKEN_SECURITY` | Discord bot token for bantay |
 | `DISCORD_GUILD_ID` | Discord server/guild ID |
 | `DISCORD_CHANNEL_BOTS` | #bots channel ID |
 | `DISCORD_CHANNEL_TEST` | Test channel ID |
+| `DISCORD_CHANNEL_SECURITY` | #security channel ID |
 
-## Deploy (Phase 2)
+## Deploy (Phase 3)
 
 ```bash
 # 1. Terraform apply (via GH Actions or manual)
@@ -41,9 +50,11 @@ cat > .env << 'EOF'
 ANTHROPIC_API_KEY=sk-ant-...
 LITELLM_MASTER_KEY=sk-litellm-...
 DISCORD_BOT_TOKEN_CHAT=...
+DISCORD_BOT_TOKEN_SECURITY=...
 DISCORD_GUILD_ID=...
 DISCORD_CHANNEL_BOTS=...
 DISCORD_CHANNEL_TEST=...
+DISCORD_CHANNEL_SECURITY=...
 EOF
 chmod 600 .env
 
