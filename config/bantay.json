@@ -1,0 +1,51 @@
+{
+  "models": {
+    "providers": {
+      "litellm": {
+        "baseUrl": "http://litellm:4000/v1",
+        "apiKey": "${LITELLM_MASTER_KEY}",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "claude-sonnet-4",
+            "name": "Claude Sonnet 4 (via LiteLLM)"
+          },
+          {
+            "id": "claude-opus-4",
+            "name": "Claude Opus 4 (via LiteLLM)"
+          },
+          {
+            "id": "claude-haiku-3.5",
+            "name": "Claude Haiku 3.5 (via LiteLLM)"
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "litellm/claude-opus-4"
+      }
+    }
+  },
+  "channels": {
+    "discord": {
+      "token": "${DISCORD_BOT_TOKEN}",
+      "groupPolicy": "allowlist",
+      "guilds": {
+        "${DISCORD_GUILD_ID}": {
+          "channels": {
+            "${DISCORD_CHANNEL_SECURITY}": { "enabled": true },
+            "${DISCORD_CHANNEL_BOTFIGHT}": { "enabled": true }
+          }
+        }
+      },
+      "dmPolicy": "disabled"
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback"
+  }
+}

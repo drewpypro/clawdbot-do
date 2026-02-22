@@ -15,22 +15,40 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  bogoyito-chat:
+  bogoylito-chat:
     build: ./openclaw
     depends_on:
       litellm:
         condition: service_healthy
     volumes:
-      - ./config/openclaw.json:/config/openclaw.json:ro
-      - ./workspace:/defaults/workspace:ro
-      - bogoyito-chat-data:/home/clawdbot/.openclaw
+      - ./config/chat.json:/config/openclaw.json:ro
+      - ./workspace/chat:/defaults/workspace:ro
+      - bogoylito-chat-data:/home/clawdbot/.openclaw
     env_file: .env
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN_CHAT}
       - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
       - DISCORD_CHANNEL_BOTS=${DISCORD_CHANNEL_BOTS}
-      - DISCORD_CHANNEL_TEST=${DISCORD_CHANNEL_TEST}
+      - DISCORD_CHANNEL_BOTFIGHT=${DISCORD_CHANNEL_BOTFIGHT}
+    restart: unless-stopped
+
+  bantay:
+    build: ./openclaw
+    depends_on:
+      litellm:
+        condition: service_healthy
+    volumes:
+      - ./config/bantay.json:/config/openclaw.json:ro
+      - ./workspace/bantay:/defaults/workspace:ro
+      - bantay-data:/home/clawdbot/.openclaw
+    env_file: .env
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN_SECURITY}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
+      - DISCORD_CHANNEL_SECURITY=${DISCORD_CHANNEL_SECURITY}
+      - DISCORD_CHANNEL_BOTFIGHT=${DISCORD_CHANNEL_BOTFIGHT}
     restart: unless-stopped
 
 volumes:
-  bogoyito-chat-data:
+  bogoylito-chat-data:
+  bantay-data:
