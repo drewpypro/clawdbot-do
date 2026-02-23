@@ -42,6 +42,10 @@ chown -R clawdbot:clawdbot /home/clawdbot/.ssh
 chmod 700 /home/clawdbot/.ssh
 chmod 600 /home/clawdbot/.ssh/authorized_keys
 
+# --- Initialize Docker Swarm (single-node) ---
+# Required for Docker secrets (encrypted at rest in Raft store)
+docker swarm init --advertise-addr 127.0.0.1
+
 # --- Clone repo for app-layer config ---
 su - clawdbot -c "git clone https://github.com/drewpypro/clawdbot-do.git /home/clawdbot/clawdbot-do"
 

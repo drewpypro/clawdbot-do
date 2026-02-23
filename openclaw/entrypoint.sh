@@ -1,4 +1,27 @@
 #!/bin/bash
+set -euo pipefail
+
+# =============================================================================
+# Read Docker Swarm secrets into env vars (if mounted)
+# =============================================================================
+# Secrets are mounted as files in /run/secrets/ (tmpfs — never on disk).
+# Convert each file to an uppercase env var so OpenClaw can read them normally.
+# =============================================================================
+
+if [ -d /run/secrets ]; then
+  for secret_file in /run/secrets/*; do
+    if [ -f "$secret_file" ]; then
+      secret_name=$(basename "$secret_file")
+      env_name=$(echo "$secret_name" | tr '[:lower:]' '[:upper:]')
+      export "$env_name"="$(cat "$secret_file")"
+    fi
+  done
+fi
+
+# =============================================================================
+# OpenClaw setup
+# =============================================================================
+
 # Create required OpenClaw directories
 mkdir -p /home/clawdbot/.openclaw/agents/main/sessions \
          /home/clawdbot/.openclaw/credentials \

@@ -1,57 +1,97 @@
+version: "3.8"
+
+# =============================================================================
+# clawdbot-do — Docker Swarm Stack
+# =============================================================================
+# Phase 4: Secrets hardening. All sensitive values come from Docker Swarm
+# secrets (encrypted at rest in Raft store, mounted as tmpfs in containers).
+# No more .env file with plaintext keys on disk.
+#
+# Deploy: docker stack deploy -c docker-compose.yml clawdbot
+# =============================================================================
+
 services:
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     ports:
-      - "127.0.0.1:4000:4000"
+      - target: 4000
+        published: 4000
+        protocol: tcp
+        mode: host
     volumes:
-      - ./config/litellm.yaml:/app/config.yaml:ro
-    env_file: .env
+      - /home/clawdbot/clawdbot-do/config/litellm.yaml:/app/config.yaml:ro
+      - /home/clawdbot/clawdbot-do/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+    entrypoint: ["docker-entrypoint.sh"]
     command: ["--config", "/app/config.yaml", "--port", "4000", "--host", "0.0.0.0"]
+    secrets:
+      - anthropic_api_key
+      - litellm_master_key
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')\""]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
-    restart: unless-stopped
+    deploy:
+      restart_policy:
+        condition: any
 
   bogoylito-chat:
-    build: ./openclaw
-    depends_on:
-      litellm:
-        condition: service_healthy
+    # Build with: docker build -t clawdbot-do-openclaw:latest ./openclaw
+    image: clawdbot-do-openclaw:latest
     volumes:
-      - ./config/chat.json:/config/openclaw.json:ro
-      - ./workspace/chat:/defaults/workspace:ro
+      - /home/clawdbot/clawdbot-do/config/chat.json:/config/openclaw.json:ro
+      - /home/clawdbot/clawdbot-do/workspace/chat:/defaults/workspace:ro
       - bogoylito-chat-data:/home/clawdbot/.openclaw
-    env_file: .env
-    environment:
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN_CHAT}
-      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
-      - DISCORD_CHANNEL_BOTS=${DISCORD_CHANNEL_BOTS}
-      - DISCORD_CHANNEL_BOTFIGHT=${DISCORD_CHANNEL_BOTFIGHT}
-      - DISCORD_CHANNEL_CLAWDBOT_DO=${DISCORD_CHANNEL_CLAWDBOT_DO}
-    restart: unless-stopped
+    secrets:
+      - source: discord_bot_token_chat
+        target: discord_bot_token
+      - discord_guild_id
+      - discord_channel_bots
+      - discord_channel_botfight
+      - discord_channel_clawdbot_do
+    deploy:
+      restart_policy:
+        condition: any
 
   bantay:
-    build: ./openclaw
-    depends_on:
-      litellm:
-        condition: service_healthy
+    image: clawdbot-do-openclaw:latest
     volumes:
-      - ./config/bantay.json:/config/openclaw.json:ro
-      - ./workspace/bantay:/defaults/workspace:ro
+      - /home/clawdbot/clawdbot-do/config/bantay.json:/config/openclaw.json:ro
+      - /home/clawdbot/clawdbot-do/workspace/bantay:/defaults/workspace:ro
       - bantay-data:/home/clawdbot/.openclaw
-    env_file: .env
-    environment:
-      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN_SECURITY}
-      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
-      - DISCORD_CHANNEL_BOTS=${DISCORD_CHANNEL_BOTS}
-      - DISCORD_CHANNEL_SECURITY=${DISCORD_CHANNEL_SECURITY}
-      - DISCORD_CHANNEL_BOTFIGHT=${DISCORD_CHANNEL_BOTFIGHT}
-      - DISCORD_CHANNEL_CLAWDBOT_DO=${DISCORD_CHANNEL_CLAWDBOT_DO}
-    restart: unless-stopped
+    secrets:
+      - source: discord_bot_token_security
+        target: discord_bot_token
+      - discord_guild_id
+      - discord_channel_bots
+      - discord_channel_security
+      - discord_channel_botfight
+      - discord_channel_clawdbot_do
+    deploy:
+      restart_policy:
+        condition: any
 
 volumes:
   bogoylito-chat-data:
   bantay-data:
+
+secrets:
+  anthropic_api_key:
+    external: true
+  litellm_master_key:
+    external: true
+  discord_bot_token_chat:
+    external: true
+  discord_bot_token_security:
+    external: true
+  discord_guild_id:
+    external: true
+  discord_channel_bots:
+    external: true
+  discord_channel_security:
+    external: true
+  discord_channel_botfight:
+    external: true
+  discord_channel_clawdbot_do:
+    external: true

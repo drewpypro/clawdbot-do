@@ -1,0 +1,62 @@
+# =============================================================================
+# Deploy App — Build images and deploy Swarm stack
+# =============================================================================
+# Builds the OpenClaw Docker image on the droplet and deploys the full stack.
+# Secrets must already exist in Swarm (run deploy-secrets first).
+# =============================================================================
+
+name: Deploy App
+
+on:
+  workflow_dispatch:
+
+env:
+  STACK_NAME: clawdbot
+
+jobs:
+  deploy-app:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Pull latest code and build
+        run: |
+          ssh -i ~/.ssh/id_ed25519 clawdbot@${{ secrets.DROPLET_IP }} '
+            cd ~/clawdbot-do
+            git pull origin main
+
+            echo "Building OpenClaw image..."
+            docker build -t clawdbot-do-openclaw:latest ./openclaw
+
+            echo "Deploying Swarm stack..."
+            docker stack deploy -c docker-compose.yml ${{ env.STACK_NAME }}
+
+            echo ""
+            echo "Stack services:"
+            docker stack services ${{ env.STACK_NAME }}
+          '
+
+      - name: Wait for services to start
+        run: |
+          ssh -i ~/.ssh/id_ed25519 clawdbot@${{ secrets.DROPLET_IP }} '
+            echo "Waiting 30s for services to stabilize..."
+            sleep 30
+
+            echo "Service status:"
+            docker stack services ${{ env.STACK_NAME }}
+
+            echo ""
+            echo "LiteLLM health:"
+            curl -sf http://localhost:4000/health/liveliness && echo " OK" || echo " FAILED"
+          '
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -rf ~/.ssh/id_ed25519
