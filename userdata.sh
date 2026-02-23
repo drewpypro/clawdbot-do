@@ -50,7 +50,7 @@ cat > /etc/motd << 'MOTD'
 
   ╔══════════════════════════════════════╗
   ║                                      ║
-  ║   (o_O)  BOGOYITO ONLINE             ║
+  ║   (o_O)  BOGOYLITO ONLINE             ║
   ║   <| |>  DO Agent Node               ║
   ║    / \   drewpypro/clawdbot-do       ║
   ║                                      ║
