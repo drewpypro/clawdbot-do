@@ -4,10 +4,10 @@ DigitalOcean infrastructure for the bogoylito fleet — containerized OpenClaw a
 
 ## Agents
 
-| Agent | Model | Purpose | Channel |
-|-------|-------|---------|---------|
-| **bogoylito-chat** | Sonnet 4 | General chat bot | #bots, #bot_fight |
-| **bantay** | Opus 4 | Security monitoring | #security, #bot_fight |
+| Agent | Model | Purpose | Channels |
+|-------|-------|---------|----------|
+| **bogoylito-chat** | Sonnet 4 | General chat bot | #bots, #bot_fight, #clawdbot-do |
+| **bantay** | Opus 4 | Security monitoring | #bots, #security, #bot_fight, #clawdbot-do |
 
 ## Required Secrets
 
@@ -36,6 +36,7 @@ DigitalOcean infrastructure for the bogoylito fleet — containerized OpenClaw a
 | `DISCORD_CHANNEL_BOTS` | #bots channel ID |
 | `DISCORD_CHANNEL_SECURITY` | #security channel ID |
 | `DISCORD_CHANNEL_BOTFIGHT` | #bot_fight channel ID |
+| `DISCORD_CHANNEL_CLAWDBOT_DO` | #clawdbot-do channel ID |
 
 ## Deploy (Phase 3)
 
@@ -45,8 +46,8 @@ DigitalOcean infrastructure for the bogoylito fleet — containerized OpenClaw a
 ssh -i ~/.ssh/clawdbot-do clawdbot@<droplet-ip>
 cd ~/clawdbot-do
 
-# 3. Create .env with secrets above
-cat > .env << 'EOF'
+# 3. Create .env with secrets above (prepend space to keep out of bash_history)
+ cat > .env << 'EOF'
 ANTHROPIC_API_KEY=sk-ant-...
 LITELLM_MASTER_KEY=sk-litellm-...
 DISCORD_BOT_TOKEN_CHAT=...
@@ -55,6 +56,7 @@ DISCORD_GUILD_ID=...
 DISCORD_CHANNEL_BOTS=...
 DISCORD_CHANNEL_SECURITY=...
 DISCORD_CHANNEL_BOTFIGHT=...
+DISCORD_CHANNEL_CLAWDBOT_DO=...
 EOF
 chmod 600 .env
 
@@ -62,6 +64,14 @@ chmod 600 .env
 docker compose build && docker compose up -d
 
 # 5. Verify
-curl http://localhost:4000/health
+docker compose ps
 docker compose logs -f
 ```
+
+## Operational Notes
+
+- `docker compose restart` does NOT re-read `.env` — use `docker compose up -d` instead
+- Config changes require volume wipe: `docker compose down <svc> && docker volume rm <vol> && docker compose up -d <svc>`
+- `channels unresolved` warning at startup is benign (race condition, resolves after login)
+- DO allows in-place CPU/RAM resize without destroying the droplet
+- Prepend commands containing secrets with a space (`HISTCONTROL=ignoreboth`)
